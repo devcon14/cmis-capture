@@ -1,0 +1,10 @@
+datadir: "test/data-barcode"
+cmis_username: "admin"
+cmis_password: "admin"
+cmis_url: "http://172.17.0.1:8080/alfresco/cmisatom"
+train_folder: "/Html Invoices"
+field_zones:
+    -
+        field_name: Barcode
+        cmis_name: "cm:title"
+        region: [0, 15, 30, 25]

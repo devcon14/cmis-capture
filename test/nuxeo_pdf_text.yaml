@@ -1,0 +1,5 @@
+datadir: "test/data-pdf-text"
+cmis_username: "Administrator"
+cmis_password: "Administrator"
+cmis_url: "http://localhost:8080/nuxeo/atom/cmis"
+capture_folder: "/default-domain/workspaces/test/Html Invoices"

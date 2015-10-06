@@ -1,0 +1,14 @@
+datadir: "test/data-demo"
+cmis_url: "http://cmis.alfresco.com/cmisatom"
+cmis_username: "admin"
+cmis_password: "admin"
+capture_folder: "/demo"
+field_zones:
+    -
+        field_name: Invoice Number
+        cmis_name: "cm:title"
+        region: [0, 12, 30, 18]
+    -
+        field_name: Total
+        cmis_name: "cm:description"
+        region: [70, 50, 100, 55]

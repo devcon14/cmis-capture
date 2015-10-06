@@ -1,0 +1,115 @@
+<head>
+<!--
+<link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
+<script src="bower_components/jquery/dist/jquery.js"></script>
+-->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<style>
+</style>
+</head>
+<div class="container">
+    <div class="list-group" id="container">
+        <div id="loading">
+            Please wait, page is busy downloading.<br>
+            This could take a few minutes.<br>
+        </div>
+    </div>
+</div>
+<li id="field_template" class="list-group-item" style="display: none">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <label class="form-control"></label>
+            <textarea class="form-control" onfocus="set_field_focus(this)" onblur="blur_field_focus(this)"></textarea>
+        </div>
+        <div class="panel-body" >
+            <img class="img-thumbnail zone" />
+            <button class="btn btn-default open1" onclick="open_in_repo(this)" tabindex=-1>
+                <span class="glyphicon glyphicon-file-open"></span> Open in Repository
+            </button>
+        </div>
+    </div>
+</li>
+<script>
+function open_in_repo(input_element) {
+    window.open($(input_element).attr('href'));
+}
+function blur_field_focus(input_element) {
+    update_cmis(input_element);
+    var panel = $(input_element).parent().parent();
+    panel.toggleClass('panel-primary');
+}
+function set_field_focus(input_element) {
+    var panel = $(input_element).parent().parent();
+    panel.toggleClass('panel-primary');
+    var row_number = $(input_element).attr('row');
+    if (row_number % frame_size == frame_size - Math.round(frame_size / 2)) {
+        frame_start += frame_size;
+        frame_end += frame_size;
+        $.getJSON("/api/regions/" + frame_start + "/" + frame_end, function(response) {
+            console.log(response);
+            load_zones(response);
+        });
+    }
+}
+function update_cmis(input_element) {
+    // console.log('updating field')
+    var json_data = JSON.stringify({
+        cmis_name: $(input_element).attr('data-cmis_name'),
+        doc_id: $(input_element).attr('data-doc_id'),
+        text: input_element.value
+    });
+    $.ajax({
+        url: "/api/update",
+        type: "POST",
+        data: json_data,
+        contentType: "application/json; charset=utf-8",
+        success: function(response_txt) {
+            var response = JSON.parse(response_txt);
+            console.log(response);
+            var upinput = $('textarea[data-doc-id="' + response.doc_id + '"]');
+            // console.log(upinput);
+            $('textarea[data-doc_id="' + response.doc_id + '"]').each(function() {
+                // console.log(this);
+                var document_field = $(this);
+                if (document_field.attr("data-cmis_name") == response.cmis_name) {
+                    // console.log(this);
+                    var panel = document_field.parent().parent();
+                    panel.addClass('panel-success');
+                }
+            })
+        },
+        error: function(jqXhr, textStatus, thrownError) {
+            console.log(thrownError);
+            var reqd = JSON.parse(this.data);
+            var panel = $("[data-doc_id='" + reqd.doc_id + "']").parent().parent();
+            panel.addClass('panel-danger');
+        }
+    });
+}
+function load_zones(regions) {
+    for (var i=0;i<regions.length;i++) {
+        var region = regions[i];
+        var template = $('#field_template').clone();
+        $(template).removeAttr('id');
+        $(template).find('textarea').attr('row', i);
+        $(template).find('textarea').val(region.text);
+        $(template).find('textarea').attr('data-doc_id', region.doc_id);
+        $(template).find('textarea').attr('data-cmis_name', region.cmis_name);
+        $(template).find('.open1').attr('href', region.repo_url);
+        $(template).attr('style', 'display: block');
+        $(template).find('img').attr('src', region.image);
+        $(template).find('label').text(region.field_name);
+        $('#container').append(template);
+    }
+}
+var frame_start = 0;
+var frame_end = 10;
+var frame_size = 10;
+$.getJSON("/api/regions/" + frame_start + "/" + frame_end, function(response) {
+    // console.log(response);
+    $('#loading').attr('style', 'display: none');
+    load_zones(response);
+    $.find('textarea')[0].focus();
+});
+</script>
