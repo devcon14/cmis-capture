@@ -1,4 +1,4 @@
-datadir: "test/data-nuxeo-demo"
+datadir: "test/data-nuxeo"
 cmis_username: "Administrator"
 cmis_password: "Administrator"
 cmis_url: "http://localhost:8080/nuxeo/atom/cmis"
@@ -6,9 +6,9 @@ capture_folder: "/default-domain/workspaces/demo"
 field_zones:
     -
         field_name: Invoice Number
-        cmis_name: "dc:title"
+        repo_name: "dc:title"
         region: [0, 12, 30, 18]
     -
-        field_name: Total
-        cmis_name: "dc:description"
+        field_name: Sub Total
+        repo_name: "dc:description"
         region: [70, 50, 100, 55]

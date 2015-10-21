@@ -55,7 +55,7 @@ function set_field_focus(input_element) {
 function update_cmis(input_element) {
     // console.log('updating field')
     var json_data = JSON.stringify({
-        cmis_name: $(input_element).attr('data-cmis_name'),
+        repo_name: $(input_element).attr('data-repo_name'),
         doc_id: $(input_element).attr('data-doc_id'),
         text: input_element.value
     });
@@ -72,7 +72,7 @@ function update_cmis(input_element) {
             $('textarea[data-doc_id="' + response.doc_id + '"]').each(function() {
                 // console.log(this);
                 var document_field = $(this);
-                if (document_field.attr("data-cmis_name") == response.cmis_name) {
+                if (document_field.attr("data-repo_name") == response.repo_name) {
                     // console.log(this);
                     var panel = document_field.parent().parent();
                     panel.addClass('panel-success');
@@ -95,7 +95,7 @@ function load_zones(regions) {
         $(template).find('textarea').attr('row', i);
         $(template).find('textarea').val(region.text);
         $(template).find('textarea').attr('data-doc_id', region.doc_id);
-        $(template).find('textarea').attr('data-cmis_name', region.cmis_name);
+        $(template).find('textarea').attr('data-repo_name', region.repo_name);
         $(template).find('.open1').attr('href', region.repo_url);
         $(template).attr('style', 'display: block');
         $(template).find('img').attr('src', region.image);

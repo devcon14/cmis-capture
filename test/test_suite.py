@@ -1,3 +1,4 @@
+import logging
 import re
 import yaml
 import os
@@ -30,7 +31,7 @@ class ExampleOCRFlow(OCRFlow):
 
 
 def setup_func():
-    for datadir in ["data-barcode", "data-ocr", "data-pdf-text"]:
+    for datadir in ["data-excel", "data-nuxeo"]:
         try:
             shutil.rmtree("test/" + datadir)
         except:
@@ -39,41 +40,26 @@ def setup_func():
             shutil.copytree("test/" + datadir + "-skeleton", "test/" + datadir)
 
 
-def test_barcode():
-    flow = BarcodeFlow("test/barcode.yaml")
-    flow.transform_documents()
-    for doc_id in os.listdir("test/data-barcode"):
-        base_filename = "test/data-barcode/" + doc_id
-        with open(base_filename + "/tr_png/tr_zxing/tr_zxing.txt") as fh:
-            page_barcode = fh.read()
-        with open(base_filename + "/tr_png/get_field_zones_0/tr_zxing/tr_zxing.txt") as fh:
-            zone_barcode = fh.read()
-        print page_barcode
-        if doc_id == "doc001":
-            assert '[10,"$",112.435]' in page_barcode
-            assert '[10,"$",112.435]' in zone_barcode
-
-
-def test_ocr():
-    flow = ExampleOCRFlow("test/ocr.yaml")
+def test_nuxeo():
+    flow = ExampleOCRFlow("test/nuxeo_demo.yaml")
     flow.download_from_cmis()
     flow.transform_documents()
     flow.extract_fields()
 
 
-def test_pdf_text():
-    flow = PDFTextFlow("test/nuxeo_pdf_text.yaml")
-    flow.download_from_cmis()
+def test_excel():
+    flow = ExampleOCRFlow("test/excel_demo.yaml")
+    flow.download_from_excel()
     flow.transform_documents()
+    flow.extract_fields()
+    return flow
+
 
 if __name__ == "__main__":
-    import logging
     with open("logging.yaml") as fh:
         log_settings = yaml.load(fh)
     logging.config.dictConfig(log_settings)
     setup_func()
-    test_barcode()
-    # test_ocr()
-    # test_nuxeo()
-    # test_pdf_text()
+    flow = test_excel()
+    # flow = test_nuxeo()
     print "tests complete"

@@ -1,4 +1,6 @@
+import shutil
 import sys
+import pandas as pd
 from urlparse import urlparse
 from processing import tr_zxing, get_hocr_zones
 from processing import tr_get_pdf_text, maketr_get_field_zones
@@ -28,6 +30,8 @@ def get_action_files(output_folder):
 
 
 def recursive_transforms(next_object, transforms):
+    # TODO allow applying an extractor method to the final transform
+    # method will update a dictionary
     if len(transforms) == 0:
         return
     trans = transforms.pop(0)
@@ -51,7 +55,6 @@ def transform(filename, action):
         return action(filename, output_folder)
     else:
         logging.debug(("skipping existing transform", output_folder))
-        # action_files = action(filename, output_folder)
         act2 = get_action_files(output_folder)
         # logging.debug((list(action_files), list(act2)))
         return act2
@@ -85,6 +88,7 @@ class CaptureFlow:
             return
         repo = CmisClient(self.settings["cmis_url"], self.settings["cmis_username"], self.settings["cmis_password"]).defaultRepository
         for document in repo.getObjectByPath(self.settings["capture_folder"]).getChildren():
+            document_name = document.getName()
             docid = document.getObjectId()
             docid = docid.replace("workspace://SpacesStore/", "")
             # remove version identifier ;1.0
@@ -93,13 +97,32 @@ class CaptureFlow:
             document_workdir = os.path.join(self.settings["datadir"], docid)
             if not os.path.exists(document_workdir):
                 os.makedirs(document_workdir)
-            local_document_path = os.path.join(document_workdir, document.getName())
+            local_document_path = os.path.join(document_workdir, document_name)
             if os.path.exists(local_document_path):
                 self.LOGGER.debug("{} exists. skipping download from CMIS".format(local_document_path))
             else:
-                self.LOGGER.debug("downloading {}".format(document.getName()))
+                self.LOGGER.debug("downloading {}".format(document_name))
                 with open(local_document_path, "w") as fh:
                     fh.write(document.getContentStream().read())
+
+    def download_from_excel(self):
+        if "excel_file" not in self.settings:
+            self.LOGGER.warn("No excel file. Skipping excel download.")
+            return
+        df = pd.read_excel(self.settings["excel_file"])
+        for docid, row in df.iterrows():
+            document_name = os.path.basename(row["location"])
+            document_workdir = os.path.join(self.settings["datadir"], str(docid))
+            if not os.path.exists(document_workdir):
+                os.makedirs(document_workdir)
+            local_document_path = os.path.join(document_workdir, document_name)
+            if os.path.exists(local_document_path):
+                self.LOGGER.debug("{} exists. skipping download from Excel".format(local_document_path))
+            else:
+                self.LOGGER.debug("downloading {}".format(document_name))
+                shutil.copy(row["location"], local_document_path)
+
+        self.df = df
 
     def transform_document(self, document_absolutepath):
         recursive_transforms(document_absolutepath, [tr_png])
@@ -117,12 +140,16 @@ class CaptureFlow:
                         self.transform_document(document_absolutepath)
 
     def build_repo_url(self, doc_id):
-        # TODO provide an internal pdf.js viewer, built on top of hocr2pdf
-        parsed_uri = urlparse(self.settings["cmis_url"])
-        if "nuxeo" in self.settings["cmis_url"]:
-            return "{}://{}/nuxeo/nxfile/default/{}/blobholder:0/".format(parsed_uri.scheme, parsed_uri.netloc, doc_id)
-        elif "alfresco" in self.settings["cmis_url"]:
-            return "{}://{}/share/page/document-details?nodeRef=workspace://SpacesStore/{}".format(parsed_uri.scheme, parsed_uri.netloc, doc_id)
+        if "cmis_url" in self.settings:
+            parsed_uri = urlparse(self.settings["cmis_url"])
+            if "nuxeo" in self.settings["cmis_url"]:
+                return "{}://{}/nuxeo/nxfile/default/{}/blobholder:0/".format(parsed_uri.scheme, parsed_uri.netloc, doc_id)
+            elif "alfresco" in self.settings["cmis_url"]:
+                return "{}://{}/share/page/document-details?nodeRef=workspace://SpacesStore/{}".format(parsed_uri.scheme, parsed_uri.netloc, doc_id)
+        else:
+            # TODO provide an internal pdf.js viewer, built on top of hocr2pdf
+            # TODO excel URL
+            return ""
 
     def load_field_zone(self, field_zones_dir):
         for fzone in os.listdir(field_zones_dir):
@@ -176,29 +203,6 @@ class CaptureFlow:
             fh.write(json.dumps(field_zones))
 
 
-class StantonFlow(CaptureFlow):
-
-    def extract_field(self, zone_info, field_zones_dir):
-        zone_info["text"] = self.get_ocr_text(field_zones_dir)
-        zone_info = self.regex_filter(zone_info)
-        return zone_info
-
-    def regex_filter(self, zone_info):
-        # logging.info(zone_info["text"])
-        m = re.match(r".*YOU (\d+\.\d+).*", zone_info["text"])
-        if m and zone_info["field_name"] == "Total":
-            logging.info(("match you", m.groups(1)))
-            zone_info["text"] = m.groups(1)
-            return zone_info
-        m = re.match(r".* (\d+) +Umts.*", zone_info["text"], re.DOTALL)
-        if m and zone_info["field_name"] == "Units":
-            logging.info(("match units", m.groups(1)))
-            zone_info["text"] = m.groups(1)
-            return zone_info
-        zone_info["text"] = ""
-        return zone_info
-
-
 class BarcodeFlow(CaptureFlow):
 
     def transform_document(self, document_absolutepath):
@@ -221,7 +225,7 @@ class DemoFlow(OCRFlow):
         return zone_info
 
     def regex_filter(self, zone_info):
-        if (zone_info["field_name"] == "Total"):
+        if (zone_info["field_name"] == "Sub Total"):
             m = re.match(r".*Total \$(\d+\.\d+).*", zone_info["text"])
             if m:
                 logging.info(("match total", m.groups(1)))
@@ -240,15 +244,3 @@ class PDFTextFlow(CaptureFlow):
 
     def transform_document(self, document_absolutepath):
         recursive_transforms(document_absolutepath, [tr_get_pdf_text])
-
-
-def main():
-    flow = CaptureFlow("stanton.yaml")
-    logging.config.dictConfig(flow.settings["logging"])
-    flow.download_from_cmis()
-    flow.transform_documents()
-    flow.extract_fields()
-
-
-if __name__ == "__main__":
-    main()
