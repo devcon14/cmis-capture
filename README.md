@@ -31,12 +31,13 @@ Current Capabilities
 --------------------
 
 * Editing documents directly on the ECMS.
+* Editing documents linked by an excel spreadsheet.
 * 1D barcode recognition (Code 128, Code 39, EAN, UPC)
 * 2D barcode recognition (Datamatrix, QR)
 * Zonal OCR.
 * Zonal field capture in the web browser.
 * Support for reading PDF, TIFF, JPG and PNG images.
-* Extracting text from PDF.
+* Extracting embedded text from electronic PDF (as well as by image OCR).
 
 Currently mostly a demo project.
 Bieng used to prototype quick tests for internal projects.
@@ -58,14 +59,19 @@ Usage
 
 To use the interface start the web server by running:
 
-    python web.py test/demo.yaml
+    python web.py
+
+This will run the default excel demo.
 
 Then point your browser to http://localhost:5000 to start capturing.
 
+To run a different configuration specify the configuration file eg.
 
-The demo.yaml points to an instance of Nuxeo on localhost by default.
+    python web.py test/nuxeo_demo.yaml
 
-You will probably need to point this to your own CMIS repo.
+The nuxeo_demo.yaml points to an instance of Nuxeo on localhost by default.
+
+You will need to edit this yaml file to point to your own running CMIS repo.
 
 
 The test subdirectory contains example python code.
@@ -83,4 +89,4 @@ Roadmap
 * Add OCR on the fly.
 * Handwriting recognition.
 * Machine learning based unstructured data extraction.
-* Integrate other engines such as ABBY online sdk.
+* Integrate other engines such as ABBY online SDK.
