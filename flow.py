@@ -29,35 +29,46 @@ def get_action_files(output_folder):
         return action_files
 
 
-def recursive_transforms(next_object, transforms):
+def recursive_transforms(next_object, transforms, transform_objects):
     # TODO allow applying an extractor method to the final transform
     # method will update a dictionary
     if len(transforms) == 0:
-        return
-    trans = transforms.pop(0)
+        return next_object
+    trans = transforms[0]
+    logging.debug(("enter recursion", next_object, trans))
     if hasattr(next_object, "__iter__"):
+        iter_objects = []
         for filename_in_list in next_object:
             logging.info(filename_in_list)
             next_object = transform(filename_in_list, trans)
-            recursive_transforms(filename_in_list, transforms)
+            # logging.debug(("in iter transform", next_object))
+            # result = recursive_transforms(filename_in_list, transforms[1:], transform_objects)
+            result = recursive_transforms(next_object, transforms[1:], transform_objects)
+            logging.debug(result)
+            iter_objects.append(result)
+        # transforms.pop(0)
+        transform_objects.append(iter_objects)
+        return iter_objects
     else:
+        # transforms.pop(0)
+        transform_objects.append(next_object)
         next_object = transform(next_object, trans)
         filename = next_object
         # logging.debug(filename)
-        recursive_transforms(filename, transforms)
+        return recursive_transforms(filename, transforms[1:], transform_objects)
 
 
 def transform(filename, action):
     output_folder = os.path.join(os.path.dirname(filename), action.__name__)
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-        logging.debug(("transforming", output_folder))
+        logging.debug(("transforming", filename, output_folder))
         return action(filename, output_folder)
     else:
         logging.debug(("skipping existing transform", output_folder))
-        act2 = get_action_files(output_folder)
+        existing_files = get_action_files(output_folder)
         # logging.debug((list(action_files), list(act2)))
-        return act2
+        return existing_files
 
 
 class CaptureFlow:
@@ -213,7 +224,10 @@ class BarcodeFlow(CaptureFlow):
 class OCRFlow(CaptureFlow):
 
     def transform_document(self, document_absolutepath):
-        recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"]), tr_tesseract_txt])
+        # FIXME extra tr_png to debug with
+        transform_paths = []
+        end_result = recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"]), tr_png, tr_tesseract_txt], transform_paths)
+        logging.debug(("result tr", transform_paths, end_result))
 
 
 class DemoFlow(OCRFlow):
