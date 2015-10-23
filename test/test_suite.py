@@ -3,7 +3,7 @@ import re
 import yaml
 import os
 import shutil
-from flow import CaptureFlow, BarcodeFlow, recursive_transforms
+from flow import CaptureFlow, recursive_transforms
 from flow import OCRFlow, PDFTextFlow
 from processing import tr_png, tr_zxing, maketr_get_field_zones
 from processing import tr_tesseract_txt
@@ -31,7 +31,7 @@ class ExampleOCRFlow(OCRFlow):
 
 
 def setup_func():
-    for datadir in ["data-excel", "data-nuxeo"]:
+    for datadir in ["data-excel", "data-nuxeo", "data-advanced"]:
         try:
             shutil.rmtree("test/" + datadir)
         except:
@@ -55,11 +55,20 @@ def test_excel():
     return flow
 
 
+def test_advanced():
+    flow = ExampleOCRFlow("test/advanced.yaml")
+    flow.download_from_excel()
+    flow.transform_documents()
+    # flow.extract_fields()
+    return flow
+
+
 if __name__ == "__main__":
     with open("logging.yaml") as fh:
         log_settings = yaml.load(fh)
     logging.config.dictConfig(log_settings)
     setup_func()
-    flow = test_excel()
+    flow = test_advanced()
+    # flow = test_excel()
     # flow = test_nuxeo()
     print "tests complete"

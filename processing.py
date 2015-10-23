@@ -80,8 +80,10 @@ def tr_zxing(png_filename, output_folder):
     result = subprocess.check_output(command_array)
     logging.debug(" ".join(command_array))
     logging.info(result)
-    with open("{}/tr_zxing.txt".format(output_folder), "w") as fh:
+    zxing_filename = "{}/tr_zxing.txt".format(output_folder)
+    with open(zxing_filename, "w") as fh:
         fh.write(result)
+    return zxing_filename
 
 
 def tr_cuneiform_txt(png_filename, output_folder):

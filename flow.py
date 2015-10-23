@@ -30,31 +30,24 @@ def get_action_files(output_folder):
 
 
 def recursive_transforms(next_object, transforms, transform_objects):
-    # TODO allow applying an extractor method to the final transform
-    # method will update a dictionary
     if len(transforms) == 0:
         return next_object
     trans = transforms[0]
-    logging.debug(("enter recursion", next_object, trans))
+    # logging.debug(("enter recursion", next_object, trans))
     if hasattr(next_object, "__iter__"):
         iter_objects = []
         for filename_in_list in next_object:
-            logging.info(filename_in_list)
+            # logging.info(filename_in_list)
             next_object = transform(filename_in_list, trans)
-            # logging.debug(("in iter transform", next_object))
             # result = recursive_transforms(filename_in_list, transforms[1:], transform_objects)
             result = recursive_transforms(next_object, transforms[1:], transform_objects)
-            logging.debug(result)
             iter_objects.append(result)
-        # transforms.pop(0)
         transform_objects.append(iter_objects)
         return iter_objects
     else:
-        # transforms.pop(0)
         transform_objects.append(next_object)
         next_object = transform(next_object, trans)
         filename = next_object
-        # logging.debug(filename)
         return recursive_transforms(filename, transforms[1:], transform_objects)
 
 
@@ -65,7 +58,7 @@ def transform(filename, action):
         logging.debug(("transforming", filename, output_folder))
         return action(filename, output_folder)
     else:
-        logging.debug(("skipping existing transform", output_folder))
+        logging.debug(("skipping existing transform", filename, output_folder))
         existing_files = get_action_files(output_folder)
         # logging.debug((list(action_files), list(act2)))
         return existing_files
@@ -214,22 +207,82 @@ class CaptureFlow:
             fh.write(json.dumps(field_zones))
 
 
+'''
 class BarcodeFlow(CaptureFlow):
 
     def transform_document(self, document_absolutepath):
         recursive_transforms(document_absolutepath, [tr_png, tr_zxing])
         recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"]), tr_zxing])
+'''
 
 
 class OCRFlow(CaptureFlow):
 
+    def extract_ocr(self, ocr_output):
+        zones = []
+        for index, zone_info in enumerate(self.settings["field_zones"]):
+            field_zones_dir = os.path.dirname(os.path.dirname(ocr_output))
+            '''
+            # currently tr_get_field_zones writes get_field_zones.json in this zone directory
+            # it contains the image which is hard to extract here
+            with io.open(os.path.join(field_zones_dir, "get_field_zones.json"), encoding="utf8") as fh:
+                out_zone = json.loads(fh.read())
+            out_zone["text"] = ""
+            # modify local path to reflect REST path
+            out_zone["image"] = zone_info["image"].replace(self.settings["datadir"], "data")
+            '''
+            out_zone = {}
+            out_zone["field_name"] = zone_info["field_name"]
+            out_zone["repo_name"] = zone_info["repo_name"]
+            out_zone["image"] = field_zones_dir + "/get_field_zones.png"
+            # load ocr
+            with io.open(ocr_output, encoding="utf8") as fh:
+                out_zone["ocr_text"] = fh.read()
+                out_zone["text"] = out_zone["ocr_text"]
+            if "regex" in zone_info:
+                m = re.match(zone_info["regex"], out_zone["ocr_text"])
+                if m:
+                    out_zone["text"] = m.group(1)
+            zones.append(out_zone)
+            logging.debug(("new zone extract", out_zone))
+        return zones
+
     def transform_document(self, document_absolutepath):
-        # FIXME extra tr_png to debug with
-        transform_paths = []
-        end_result = recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"]), tr_png, tr_tesseract_txt], transform_paths)
-        logging.debug(("result tr", transform_paths, end_result))
+        zone_transform_paths = []
+        zone_images = recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"])], zone_transform_paths)
+        for index, field_zone in enumerate(zone_images):
+            zone_settings = self.settings["field_zones"][index]
+            logging.debug(field_zone)
+            if zone_settings["extractor"]["class"] == "OCR":
+                ocr_transform_paths = []
+                ocr_output = recursive_transforms(field_zone, [tr_tesseract_txt], ocr_transform_paths)
+                zones = self.extract_ocr(ocr_output)
+                logging.debug(zones)
+            if zone_settings["extractor"]["class"] == "Barcode":
+                barcode_transform_paths = []
+                zxing_output = recursive_transforms(field_zone, [tr_zxing], barcode_transform_paths)
+                logging.debug("ZXING: " + zxing_output)
+                with open(zxing_output) as fh:
+                    lines = fh.readlines()
+                    barcode_text = lines[2]
+                    barcode_dict = json.loads(barcode_text)
+                    logging.debug(barcode_dict)
+
+        '''
+        ocr_outputs = recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"]), tr_tesseract_txt], transform_paths)
+        zones = self.extract_ocr(ocr_outputs)
+        # write document info
+        info_folder = os.path.join(os.path.dirname(document_absolutepath), "info")
+        if not os.path.exists(info_folder):
+            os.makedirs(info_folder)
+        with io.open("{}/document.json".format(info_folder), "w", encoding="utf8") as fh:
+            data = json.dumps(zones, ensure_ascii=False)
+            logging.debug(data)
+            fh.write(unicode(data))
+        '''
 
 
+'''
 class DemoFlow(OCRFlow):
 
     def extract_field(self, zone_info, field_zones_dir):
@@ -252,6 +305,7 @@ class DemoFlow(OCRFlow):
                 zone_info["text"] = m.groups(1)
                 return zone_info
         return zone_info
+'''
 
 
 class PDFTextFlow(CaptureFlow):
