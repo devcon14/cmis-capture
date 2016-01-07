@@ -29,6 +29,12 @@ def get_action_files(output_folder):
         return action_files
 
 
+def apply_transforms(next_object, transforms):
+    transform_objects = []
+    final_outputs = recursive_transforms(next_object, transforms, transform_objects)
+    return final_outputs, transform_objects
+
+
 def recursive_transforms(next_object, transforms, transform_objects):
     if len(transforms) == 0:
         return next_object
@@ -37,9 +43,7 @@ def recursive_transforms(next_object, transforms, transform_objects):
     if hasattr(next_object, "__iter__"):
         iter_objects = []
         for filename_in_list in next_object:
-            # logging.info(filename_in_list)
             next_object = transform(filename_in_list, trans)
-            # result = recursive_transforms(filename_in_list, transforms[1:], transform_objects)
             result = recursive_transforms(next_object, transforms[1:], transform_objects)
             iter_objects.append(result)
         transform_objects.append(iter_objects)
@@ -58,10 +62,12 @@ def transform(filename, action):
         logging.debug(("transforming", filename, output_folder))
         return action(filename, output_folder)
     else:
-        logging.debug(("skipping existing transform", filename, output_folder))
-        existing_files = get_action_files(output_folder)
-        # logging.debug((list(action_files), list(act2)))
-        return existing_files
+        # logging.debug(("skipping existing transform", filename, output_folder))
+        # existing_files = get_action_files(output_folder)
+        # return existing_files
+        # FIXME checking for the existing output_folder is buggy when there is for instance multipage png outputs
+        logging.debug(("running existing transform just in case", filename, output_folder))
+        return action(filename, output_folder)
 
 
 class CaptureFlow:
@@ -126,8 +132,6 @@ class CaptureFlow:
                 self.LOGGER.debug("downloading {}".format(document_name))
                 shutil.copy(row["location"], local_document_path)
 
-        self.df = df
-
     def transform_document(self, document_absolutepath):
         recursive_transforms(document_absolutepath, [tr_png])
 
@@ -155,6 +159,7 @@ class CaptureFlow:
             # TODO excel URL
             return ""
 
+    '''
     def load_field_zone(self, field_zones_dir):
         for fzone in os.listdir(field_zones_dir):
             if fzone.endswith(".json"):
@@ -175,11 +180,7 @@ class CaptureFlow:
             return ocr_txt
         else:
             return ""
-
-    def extract_field(self, zone_info, field_zones_dir):
-        """Main customizable extraction method.
-        """
-        return zone_info
+    '''
 
     def extract_fields(self, frame_start=0, frame_end=20):
         self.LOGGER.debug("loading frame from {} to {}".format(frame_start, frame_end))
@@ -190,16 +191,18 @@ class CaptureFlow:
             document_workdir = os.path.join(self.settings["datadir"], doc_id)
             # avoid master.js files in data
             if os.path.isdir(document_workdir):
-                png_folder = os.path.join(document_workdir, "tr_png")
-                for document_subfolder in os.listdir(png_folder):
-                    if document_subfolder.startswith("get_field_zones_"):
-                        field_zones_dir = os.path.join(png_folder, document_subfolder)
-                        zone_info = self.load_field_zone(field_zones_dir)
-                        zone_info["repo_url"] = self.build_repo_url(doc_id)
-                        zone_info["doc_id"] = doc_id
-                        # self.LOGGER.debug("Extracting field" + document_subfolder)
-                        zone_info = self.extract_field(zone_info, field_zones_dir)
-                        field_zones.append(zone_info)
+                with io.open(document_workdir + "/info/document.json", encoding="utf8") as fh:
+                    json_text = fh.read()
+                    document_zones = json.loads(json_text)
+                    for document_zone in document_zones:
+                        document_zone["repo_url"] = self.build_repo_url(doc_id)
+                        document_zone["doc_id"] = doc_id
+                        # modify local path to reflect REST path
+                        document_zone["image"] = document_zone["image"].replace(self.settings["datadir"], "data")
+                        if "hidden" in document_zone:
+                            logging.info((document_zone, "hidden field"))
+                        else:
+                            field_zones.append(document_zone)
         with open(os.path.join(self.settings["datadir"], "field_zones.json"), "w") as fh:
             fh.write(json.dumps(field_zones))
         with open(os.path.join(self.settings["datadir"], "field_zones.js"), "w") as fh:
@@ -207,70 +210,58 @@ class CaptureFlow:
             fh.write(json.dumps(field_zones))
 
 
-'''
-class BarcodeFlow(CaptureFlow):
-
-    def transform_document(self, document_absolutepath):
-        recursive_transforms(document_absolutepath, [tr_png, tr_zxing])
-        recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"]), tr_zxing])
-'''
-
-
 class OCRFlow(CaptureFlow):
 
-    def extract_ocr(self, ocr_output):
-        zones = []
-        for index, zone_info in enumerate(self.settings["field_zones"]):
-            field_zones_dir = os.path.dirname(os.path.dirname(ocr_output))
-            '''
-            # currently tr_get_field_zones writes get_field_zones.json in this zone directory
-            # it contains the image which is hard to extract here
-            with io.open(os.path.join(field_zones_dir, "get_field_zones.json"), encoding="utf8") as fh:
-                out_zone = json.loads(fh.read())
-            out_zone["text"] = ""
-            # modify local path to reflect REST path
-            out_zone["image"] = zone_info["image"].replace(self.settings["datadir"], "data")
-            '''
-            out_zone = {}
-            out_zone["field_name"] = zone_info["field_name"]
-            out_zone["repo_name"] = zone_info["repo_name"]
-            out_zone["image"] = field_zones_dir + "/get_field_zones.png"
-            # load ocr
-            with io.open(ocr_output, encoding="utf8") as fh:
-                out_zone["ocr_text"] = fh.read()
-                out_zone["text"] = out_zone["ocr_text"]
-            if "regex" in zone_info:
-                m = re.match(zone_info["regex"], out_zone["ocr_text"])
-                if m:
-                    out_zone["text"] = m.group(1)
-            zones.append(out_zone)
-            logging.debug(("new zone extract", out_zone))
-        return zones
+    def extract_ocr(self, ocr_output, out_zone, zone_info):
+        with io.open(ocr_output, encoding="utf8") as fh:
+            out_zone["ocr_text"] = fh.read()
+            out_zone["text"] = out_zone["ocr_text"]
+        if "regex" in zone_info:
+            m = re.match(zone_info["regex"], out_zone["ocr_text"])
+            if m:
+                out_zone["text"] = m.group(1)
+        logging.debug(("new zone extract", out_zone))
 
     def transform_document(self, document_absolutepath):
-        zone_transform_paths = []
-        zone_images = recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"])], zone_transform_paths)
-        for index, field_zone in enumerate(zone_images):
-            zone_settings = self.settings["field_zones"][index]
-            logging.debug(field_zone)
-            if zone_settings["extractor"]["class"] == "OCR":
-                ocr_transform_paths = []
-                ocr_output = recursive_transforms(field_zone, [tr_tesseract_txt], ocr_transform_paths)
-                zones = self.extract_ocr(ocr_output)
-                logging.debug(zones)
-            if zone_settings["extractor"]["class"] == "Barcode":
-                barcode_transform_paths = []
-                zxing_output = recursive_transforms(field_zone, [tr_zxing], barcode_transform_paths)
-                logging.debug("ZXING: " + zxing_output)
-                with open(zxing_output) as fh:
-                    lines = fh.readlines()
-                    barcode_text = lines[2]
-                    barcode_dict = json.loads(barcode_text)
-                    logging.debug(barcode_dict)
-
-        '''
-        ocr_outputs = recursive_transforms(document_absolutepath, [tr_png, maketr_get_field_zones(self.settings["field_zones"]), tr_tesseract_txt], transform_paths)
-        zones = self.extract_ocr(ocr_outputs)
+        if "pdftext" in self.settings:
+            pages, _ = apply_transforms(document_absolutepath, [tr_get_pdf_text])
+        if ("page-0") not in self.settings:
+            return
+        pages, _ = apply_transforms(document_absolutepath, [tr_png])
+        if isinstance(pages, basestring):
+            pages = [pages]
+        zones = []
+        for page_number, page in enumerate(pages):
+            if not "page-{}".format(page_number) in self.settings:
+                logging.warn("no zones defined for page {}".format(page_number))
+                continue
+            field_zones = self.settings["page-{}".format(page_number)]["field_zones"]
+            zone_images, _ = apply_transforms(page, [maketr_get_field_zones(field_zones, page_number)])
+            for index, field_zone in enumerate(zone_images):
+                zone_settings = self.settings["page-{}".format(page_number)]["field_zones"][index]
+                field_zones_dir = os.path.dirname(field_zone)
+                out_zone = {}
+                out_zone["field_name"] = zone_settings["field_name"]
+                out_zone["repo_name"] = zone_settings["repo_name"]
+                out_zone["image"] = field_zones_dir + "/get_field_zones.png"
+                if "hidden" in zone_settings:
+                    out_zone["hidden"] = ""
+                logging.debug(field_zones_dir)
+                if zone_settings["extractor"]["class"] == "OCR":
+                    ocr_transform_paths = []
+                    ocr_output = recursive_transforms(field_zone, [tr_tesseract_txt], ocr_transform_paths)
+                    self.extract_ocr(ocr_output, out_zone, zone_settings)
+                if zone_settings["extractor"]["class"] == "Barcode":
+                    barcode_transform_paths = []
+                    zxing_output = recursive_transforms(field_zone, [tr_zxing], barcode_transform_paths)
+                    logging.debug("ZXING: " + zxing_output)
+                    with open(zxing_output) as fh:
+                        lines = fh.readlines()
+                        barcode_text = lines[2]
+                        barcode_dict = json.loads(barcode_text)
+                        out_zone["text"] = barcode_text
+                        logging.debug(barcode_dict)
+                zones.append(out_zone)
         # write document info
         info_folder = os.path.join(os.path.dirname(document_absolutepath), "info")
         if not os.path.exists(info_folder):
@@ -279,33 +270,6 @@ class OCRFlow(CaptureFlow):
             data = json.dumps(zones, ensure_ascii=False)
             logging.debug(data)
             fh.write(unicode(data))
-        '''
-
-
-'''
-class DemoFlow(OCRFlow):
-
-    def extract_field(self, zone_info, field_zones_dir):
-        zone_info["text"] = self.get_ocr_text(field_zones_dir)
-        zone_info = self.regex_filter(zone_info)
-        logging.info(zone_info)
-        return zone_info
-
-    def regex_filter(self, zone_info):
-        if (zone_info["field_name"] == "Sub Total"):
-            m = re.match(r".*Total \$(\d+\.\d+).*", zone_info["text"])
-            if m:
-                logging.info(("match total", m.groups(1)))
-                zone_info["text"] = m.groups(1)
-                return zone_info
-        if (zone_info["field_name"] == "Invoice Number"):
-            m = re.match(r".*Invoice #(\d+).*", zone_info["text"])
-            if m:
-                logging.info(("match invno", m.groups(1)))
-                zone_info["text"] = m.groups(1)
-                return zone_info
-        return zone_info
-'''
 
 
 class PDFTextFlow(CaptureFlow):

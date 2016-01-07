@@ -1,14 +1,19 @@
 excel_file: "test/demo.xlsx"
 datadir: "test/data-excel"
-field_zones:
-    -
-        field_name: Sub Total
-        # in excel the repo name is the column name
-        repo_name: "B"
-        region: [70, 50, 100, 55]
-        regex: ".*\\$(\\d+\\.\\d+) .*"
-    -
-        field_name: Invoice Number
-        repo_name: "C"
-        region: [0, 12, 30, 18]
-        regex: ".*Invoice #(\\d+).*"
+page-0:
+    field_zones:
+        -
+            field_name: Sub Total
+            # in excel the repo name is the column name
+            repo_name: "B"
+            region: [70, 50, 100, 55]
+            extractor:
+                class: "OCR"
+                regex: ".*\\$(\\d+\\.\\d+) .*"
+        -
+            field_name: Invoice Number
+            repo_name: "C"
+            region: [0, 12, 30, 18]
+            extractor:
+                class: "OCR"
+                regex: ".*Invoice #(\\d+).*"

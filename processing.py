@@ -29,16 +29,16 @@ def tr_get_pdf_text(pdf_filename_absolute, pdfminer_folder):
         with io.open(text_filename, "w", encoding="utf8") as f:
             f.write(unicode(pdf_dict["markup"]["innerText"]))
     else:
-        LOGGER.warn("Pdfminer extraction failure.")
+        LOGGER.warn(("Pdfminer extraction failure.", pdf_dict["error"]))
 
 
-def maketr_get_field_zones(zones):
+def maketr_get_field_zones(zones, page_number):
     def get_field_zones(image_filename, output_folder):
         LOGGER = logging.getLogger(__name__)
         LOGGER.info(image_filename)
         image = PillowImage.open(image_filename)
         for index, field_zone in enumerate(zones):
-            field_zone_folder = "{0}_{1}".format(output_folder, index)
+            field_zone_folder = "{0}_{1}_{2}".format(output_folder, page_number, index)
             if not os.path.exists(field_zone_folder):
                 os.makedirs(field_zone_folder)
             zone_percent = field_zone["region"]
@@ -57,7 +57,6 @@ def maketr_get_field_zones(zones):
             with io.open("{0}/get_field_zones.json".format(field_zone_folder), "w", encoding="utf8") as fh:
                 data = json.dumps(field_zone, ensure_ascii=False)
                 fh.write(unicode(data))
-                # json.dump(text, fh, ensure_ascii=False)
             yield image_path
     return get_field_zones
 
@@ -132,6 +131,7 @@ def tr_png(local_document_path, output_folder):
         img.save(filename=out_filename)
         if len(img.sequence) > 1:
             logging.info("multipage {}".format(local_document_path))
+            return [os.path.join(output_folder, basename + "-" + str(index) + ".png") for index, x in enumerate(img.sequence)]
         return out_filename
 
 

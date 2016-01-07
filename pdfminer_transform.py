@@ -20,6 +20,9 @@ class PdfminerTransform(BaseTransform):
         self.laparams.word_margin = 0.2
         self.laparams.line_margin = 0.3
         self.laparams.char_margin = 1.0
+        # self.laparams.line_margin = 1.1
+        # self.laparams.word_margin = 5.2
+        # self.laparams.char_margin = 5.2
         self.laparams.boxes_flow = 0.5
         self.laparams.all_texts = False
 
@@ -37,13 +40,15 @@ class PdfminerTransform(BaseTransform):
             maxpages = 0
             caching = True
             pagenos = set()
-            for page in PDFPage.get_pages(fp, pagenos, maxpages=maxpages, password=password, caching=caching, check_extractable=True):
+            # NOTE check_extractable seems to allow overriding text extraction locks
+            for page in PDFPage.get_pages(fp, pagenos, maxpages=maxpages, password=password, caching=caching, check_extractable=False):
                 interpreter.process_page(page)
             fp.close()
             device.close()
             html = retstr.getvalue()
+            # otherwise html is str at this point, not unicode
+            html = html.decode('utf8')
             retstr.close()
-            # FIXME html is str at this point, not unicode
             soup = BeautifulSoup(html)
             # LOGGER.debug(soup.text)
             text_size = len(soup.text)
@@ -62,7 +67,7 @@ class PdfminerTransform(BaseTransform):
             }
         except Exception as e:
             stub_data = {
-                "error": e.message,
+                "error": str(e),
                 "workflow": {
                     "is_stub": True
                 },

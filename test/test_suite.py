@@ -10,6 +10,7 @@ from processing import tr_tesseract_txt
 from cmislib import CmisClient
 
 
+'''
 class ExampleBarcodeFlow(CaptureFlow):
 
     def transform_document(self, document_absolutepath):
@@ -28,10 +29,11 @@ class ExampleOCRFlow(OCRFlow):
         zone_info["raw_text"] = ocr_txt
         zone_info["text"] = extracted_txt
         self.LOGGER.debug(zone_info)
+'''
 
 
 def setup_func():
-    for datadir in ["data-excel", "data-nuxeo", "data-advanced"]:
+    for datadir in ["data-excel", "data-nuxeo", "data-advanced", "data-multipage", "data-pdftext"]:
         try:
             shutil.rmtree("test/" + datadir)
         except:
@@ -41,14 +43,15 @@ def setup_func():
 
 
 def test_nuxeo():
-    flow = ExampleOCRFlow("test/nuxeo_demo.yaml")
+    flow = OCRFlow("test/nuxeo_demo.yaml")
     flow.download_from_cmis()
     flow.transform_documents()
     flow.extract_fields()
 
 
 def test_excel():
-    flow = ExampleOCRFlow("test/excel_demo.yaml")
+    # flow = ExampleOCRFlow("test/excel_demo.yaml")
+    flow = OCRFlow("test/excel_demo.yaml")
     flow.download_from_excel()
     flow.transform_documents()
     flow.extract_fields()
@@ -56,10 +59,27 @@ def test_excel():
 
 
 def test_advanced():
-    flow = ExampleOCRFlow("test/advanced.yaml")
+    flow = OCRFlow("test/advanced.yaml")
+    # flow = ExampleOCRFlow("test/advanced.yaml")
     flow.download_from_excel()
     flow.transform_documents()
-    # flow.extract_fields()
+    flow.extract_fields()
+    return flow
+
+
+def test_multipage():
+    flow = OCRFlow("test/multipage.yaml")
+    flow.download_from_excel()
+    flow.transform_documents()
+    flow.extract_fields()
+    return flow
+
+
+def test_pdftext():
+    # flow = OCRFlow("test/pdftext.yaml")
+    flow = OCRFlow("test/edcon.yaml")
+    flow.download_from_excel()
+    flow.transform_documents()
     return flow
 
 
@@ -68,7 +88,9 @@ if __name__ == "__main__":
         log_settings = yaml.load(fh)
     logging.config.dictConfig(log_settings)
     setup_func()
-    flow = test_advanced()
+    # flow = test_multipage()
+    # flow = test_advanced()
     # flow = test_excel()
     # flow = test_nuxeo()
+    flow = test_pdftext()
     print "tests complete"

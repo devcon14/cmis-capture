@@ -12,7 +12,7 @@ from openpyxl import Workbook, load_workbook
 import logging
 import logging.config
 import sys
-from flow import BarcodeFlow, OCRFlow, DemoFlow
+from flow import OCRFlow
 flaskapp = Flask(__name__)
 
 
@@ -85,18 +85,21 @@ if __name__ == "__main__":
         config_filename = sys.argv[1]
     except:
         config_filename = "test/excel_demo.yaml"
+        # config_filename = "test/multipage.yaml"
+        # config_filename = "test/advanced.yaml"
     with open("logging.yaml") as fh:
         log_settings = yaml.load(fh)
     logging.config.dictConfig(log_settings)
     LOGGER = logging.getLogger(__name__)
     LOGGER.info("Logging enabled")
     flaskapp.secret_key = 'super secret key'
-    flow = DemoFlow(config_filename)
+    flow = OCRFlow(config_filename)
     # flow.upload_sample_documents()
     if "excel_file" in flow.settings:
         flow.download_from_excel()
     if "cmis_url" in flow.settings:
         flow.download_from_cmis()
     flow.transform_documents()
+    flow.extract_fields()
     serve_gevent()
     LOGGER.info("Web server started")
