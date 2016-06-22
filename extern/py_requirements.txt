@@ -1,0 +1,16 @@
+# python requirements
+cmislib
+Wand
+pdfminer
+# scikit-image
+beautifulsoup4
+flask
+nose
+pyyaml
+Pillow
+# for production server
+gevent
+# for excel features
+pandas
+xlrd
+openpyxl

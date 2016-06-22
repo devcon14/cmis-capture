@@ -46,7 +46,13 @@ Bieng used to prototype quick tests for internal projects.
 Installation
 ------------
 
-You can build a docker container from the base folder where you cloned the source code.
+cmis-capture is configured to run from a docker container.
+
+To run from docker hub use:
+
+    docker run --name capture -p 5000:5000 devcon/cmis-capture
+
+To build the docker image from source:
     
     docker build -t devcon/cmis-capture .
 
@@ -57,13 +63,11 @@ But it is preferable to install in a virtual environment.
 Usage
 -----
 
-To use the interface start the web server by running:
+By default the docker image runs the excel demo as a web service by running:
 
     python web.py
 
-This will run the default excel demo.
-
-Then point your browser to http://localhost:5000 to start capturing.
+You can point your browser to http://localhost:5000 to start capturing.
 
 To run a different configuration specify the configuration file eg.
 
