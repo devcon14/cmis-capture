@@ -50,7 +50,7 @@ cmis-capture is configured to run from a docker container.
 
 To run from docker hub use:
 
-    docker run --name capture -p 5000:5000 devcon/cmis-capture
+    docker run --name capture -d -p 5000:5000 devcon/cmis-capture
 
 To build the docker image from source:
     
